@@ -1,0 +1,6 @@
+\venv
+\.idea
+\timetables
+*.db
+*.pyc
+\logs

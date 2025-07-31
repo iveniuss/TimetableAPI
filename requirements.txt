@@ -1,0 +1,6 @@
+fastapi
+requests
+openpyxl
+beautifulsoup4
+xls2xlsx
+uvicorn
