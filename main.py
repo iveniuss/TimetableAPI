@@ -15,6 +15,13 @@ DATABASE = "file:database.db?mode=ro"
 
 PATTERN = r'^[a-zA-Z]+-\d{2}-\d{1}$'
 
+OPT_NAMES = {
+    "web": "Web-программирование",
+    "BI": "Инструментальные средства BI",
+    "Low-code": "Low-Code",
+    "Linux": "Системное программирование в Linux"
+}
+
 app = FastAPI()
 
 app.add_middleware(
@@ -98,6 +105,33 @@ async def get_subgroup(group: str, subgroup: str):
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(f"SELECT * FROM [{group}] WHERE subgroup = ?", (subgroup,))
+        lessons = []
+        for i in cur.fetchall():
+            lessons.append({
+            'id': i[0],
+            'name': i[1],
+            'teacher': i[2],
+            'location': i[3],
+            'group': i[4],
+            'start': i[5],
+            'end': i[6],
+            'link': i[7]
+            })
+        conn.close()
+        return lessons
+    except sqlite3.Error as e:
+        logging.error(e)
+        raise HTTPException(status_code=500, detail="Database error")
+
+@app.get("/optional/{name}")
+async def get_optional(name: str):
+    try:
+        if not name in OPT_NAMES:
+            raise HTTPException(status_code=400, detail="Invalid table name")
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(f"SELECT * FROM [{OPT_NAMES.get(name)}]")
         lessons = []
         for i in cur.fetchall():
             lessons.append({

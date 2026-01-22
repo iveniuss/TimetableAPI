@@ -6,7 +6,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 TL_pat = "* ?.?. (*)"
 
 WEEKDAYS = ("Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота")
-IGNORE = ("None", "Английский язык", "Военная кафедра")
+IGNORE = ("None", "Английский язык", "Военная кафедра") # Пары с такими словами будут игнорироваться
 
 
 def _format_date_time(start_time, end_time, date):
@@ -42,7 +42,8 @@ class Lessons(object):
     def __init__(self, group: dict):
         self.lessons = []
         self.group_info = group
-        
+
+    # Получение номера столбца нужной группы
     def _get_group_column(self, sheet:Worksheet):
         row = 3
         
@@ -51,6 +52,7 @@ class Lessons(object):
                 return column
         return -1
 
+    # Добавление всех пар заданной группы с листа
     def add_lessons_from_sheet(self, sheet):
         column = self._get_group_column(sheet)
         if column < 1:
@@ -78,28 +80,30 @@ class Lessons(object):
                 l.add_date(start, end)
                 self.lessons.append(l)
 
-
-    def _parse_lessons(self, cell_value: str) -> list:
+    # Разделение текста в ячейке на список пар
+    def _parse_lessons(self, cell_value: str) -> list[Lesson]:
         cell_list = list(filter(None,cell_value.split("\n")))
 
+
+        # Определение паттерна в ячейке
         order = ""
         for s in cell_list:
             if fnmatch(s, TL_pat):
-                order+="D"
+                order+="D" # Описание (Имя преподавателя + аудитория)
             elif fnmatch(s, "http*"):
-                order+="L"
+                order+="L" # Ссылка на онлайн пару
             else:
-                order+="N"
+                order+="N" # Название пары
 
         lessons = []
-        
+
+        # Разбиение текста в ячейке на части
         if order == "ND":
             tchr, loc = _split_teacher_location(cell_list[1])
             lessons.append(Lesson(cell_list[0], tchr, loc))
         elif order == "NDND":
             tchr, loc = _split_teacher_location(cell_list[1])
             lessons.append(Lesson(cell_list[0], tchr, loc))
-
             tchr, loc = _split_teacher_location(cell_list[3])
             lessons.append(Lesson(cell_list[2], tchr, loc))
         elif order == "NDL":
@@ -113,10 +117,32 @@ class Lessons(object):
             lessons.append(Lesson(cell_list[0], tchr, loc))
         elif order == "N":
             lessons.append(Lesson(cell_list[0]))
+        else:
+            mult_lessons = []
+            index = 0
+            flag = False
+            while index < len(cell_list)-1:
+                if order[index:index+3] == "NDL":
+                    tchr, loc = _split_teacher_location(cell_list[index + 1])
+                    mult_lessons.append(Lesson(cell_list[index], tchr, loc, link=cell_list[index + 2]))
+                    index+=3
+                elif order[index:index+2] == "ND":
+                    tchr, loc = _split_teacher_location(cell_list[index+1])
+                    mult_lessons.append(Lesson(cell_list[index], tchr, loc))
+                    index+=2
+                else:
+                    flag = True
+                    break
 
+            if not flag:
+                lessons += mult_lessons
 
+        # Разделение на подгруппы
         for lesson in lessons.copy():
-            if ',' in lesson.location:
+            if (',' in lesson.location
+                    and "НИС" not in lesson.name
+                    and "Коммуникационный менеджмент" not in lesson.name
+                    and "Организационное поведение" not in lesson.name):
                 lesson.group = lesson.location[-1]
                 lesson.location = lesson.location[:lesson.location.find(',')]
             else:
@@ -127,7 +153,7 @@ class Lessons(object):
         
         return lessons
 
-    def get_lessons_dict(self, prev_timetable):
+    def get_lessons_dict(self, prev_timetable) -> dict[str, list[Lesson]]:
         only_in_prev = [
             prev_lesson
             for prev_lesson in prev_timetable

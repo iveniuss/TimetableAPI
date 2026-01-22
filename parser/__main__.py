@@ -22,7 +22,6 @@ while True:
     try:
         logging.info("--START--")
 
-
         start_time = datetime.datetime.now()
 
         timetable.update_timetable()
@@ -30,6 +29,24 @@ while True:
         conn = sqlite3.connect("database.db")
         conn.execute("PRAGMA journal_mode=WAL;")
         cur = conn.cursor()
+
+        for opt in optional:
+            cur.execute(
+                f"""
+                    CREATE TABLE IF NOT EXISTS [{opt}] (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT,
+                        teacher TEXT,
+                        location TEXT,
+                        subgroup TEXT,
+                        start TEXT,
+                        end TEXT,
+                        link TEXT
+                        )
+                """
+            )
+
+        conn.commit()
 
         for group in groups:
             cur.execute(
@@ -53,24 +70,46 @@ while True:
                     continue
                 worksheet = workbook[f"{group.get('course')} курс"]
                 lessons.add_lessons_from_sheet(worksheet)
-                
+
             cur.execute(f"SELECT * FROM [{group['id']}]")
             prev_timetable = []
             tuple = cur.fetchall()
-            
-            if len(tuple) >=1:
+
+            for opt in optional:
+                cur.execute(f"SELECT * FROM [{opt}]")
+                tuple += cur.fetchall()
+
+            if len(tuple) >= 1:
                 for ls_info in tuple:
                     ls = Lesson().from_tuple(ls_info)
                     prev_timetable.append(ls)
 
             sep_lessons = lessons.get_lessons_dict(prev_timetable)
             for ls in sep_lessons["to_add"]:
-                cur.execute(f"INSERT INTO [{group['id']}] (name, teacher, location, subgroup, start, end, link) VALUES (?, ?, ?,?,?,?,?)", ls.get_tuple())
+                is_opt = False
+                for opt in optional:
+                    if opt in ls.name:
+                        cur.execute(f"INSERT INTO [{opt}] (name, teacher, location, subgroup, start, end, link) VALUES (?, ?, ?,?,?,?,?)",
+                        ls.get_tuple())
+                        is_opt = True
+                        break
 
+                if not is_opt:
+                    cur.execute(
+                        f"INSERT INTO [{group['id']}] (name, teacher, location, subgroup, start, end, link) VALUES (?, ?, ?,?,?,?,?)",
+                        ls.get_tuple())
 
             for ls in sep_lessons["to_del"]:
-                cur.execute(f"DELETE FROM [{group['id']}] WHERE id = ?", (ls.id,))
-                
+                is_opt = False
+                for opt in optional:
+                    if opt in ls.name:
+                        cur.execute(
+                            f"DELETE FROM [{opt}] WHERE id = ?", (ls.id,))
+                        is_opt = True
+                        break
+                if not is_opt:
+                    cur.execute(f"DELETE FROM [{group['id']}] WHERE id = ?", (ls.id,))
+
             conn.commit()
 
             logging.info(
@@ -84,5 +123,3 @@ while True:
     except Exception as e:
         logging.exception(e)
         sleep(30)
-
-

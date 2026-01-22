@@ -54,7 +54,7 @@ class Timetable(object):
         count = 0
 
         for a in soup.find_all("a"):
-            if "Расписание занятий (" in a.text or "СЕССИЯ" in a.text:
+            if "Расписание занятий (" in a.text or "сессия" in a.text.lower():
                 links.append(a.get("href"))
 
         print(links)

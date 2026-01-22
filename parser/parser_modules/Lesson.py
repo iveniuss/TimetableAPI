@@ -40,14 +40,13 @@ class Lesson(object):
                 and self.end == other.end
                 and self.link == other.link
             )
-        return False
 
     def add_date(self, start, end):
         self.start = start
         self.end = end
 
     def get_tuple(self):
-        return self.name, self.teacher, self.location, self.group, self.start, self.end, self.link
+        return (self.name, self.teacher, self.location, self.group, self.start, self.end, self.link)
     
     def copy(self):
         return Lesson(self.name, self.teacher, self. location, self.group, self.start, self.end, self.link)
